@@ -44,11 +44,18 @@ def delete_directory_and_file(dir_name):
             print(f'Error - Cannot delete directory')
       print('Delete Complete')
 
-
-video_url1 = 'https://b01-kr-naver-vod.pstatic.net/navertv/a/read/v2/VOD_ALPHA/navertv_2021_10_07_1609/hls/d0773936-276f-11ec-8222-246e963a41ed-'
-video_url2 = '.ts?_lsu_sa_=6dd531f881356ec682d695526fe51ab4cead3d08a706bfa432378bc1c7c43b25562ebaa96cf5b503903331c2153d9b09aede819eab6bd62191f9da472ee397b39d090c9689cf22b95fcf30c438e77306c83bb763e071b6c6966b7c3ed0405ad7ceafd65582b27f19320e3199664d31ea45cd8abba1cfe9a5c5cb1872c54442387be1ce4f626ffdc8e6438591e84d8fe6'
 dir_name = '211007'
 
-save_video(video_url1, video_url2, 999999, dir_name)
+url = 'https://b01-kr-naver-vod.pstatic.net/navertv/a/read/v2/VOD_ALPHA/navertv_2021_10_07_1609/hls/d0773936-276f-11ec-8222-246e963a41ed-000006.ts?_lsu_sa_=6bb561f0c1a76cf680d995166585fabd5e4137c8a90fbf283d472eca57b435b5382e3ac664f5a20df0f4344299382bbfe4969cc76dbf9dd70f15477f76992803cc910492ecd164f51ee389d1fa43b1efac60f4fce26c83e9d10c8c06364a385e3f338262b9285dac1987f8309af8eb785be81db9079e049d1cfcb713b820e5f4248bc146be2d36e9d2faec4782856ee5'
+keyword = '.ts'
+
+# keyword를 기준으로 URL을 분리
+video_url1, video_url2 = url.split(keyword, 1)
+
+# .ts를 기준으로 나뉜 두 부분 처리
+video_url1 = video_url1[:-6]  # 마지막 6글자 (.ts 이전까지) 제거
+video_url2 = keyword + video_url2  # .ts 다시 추가
+
+save_video(video_url1, video_url2, 100, dir_name)
 merge_videos(dir_name)
-delete_directory_and_file(dir_name)
+#delete_directory_and_file(dir_name)
