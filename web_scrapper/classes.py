@@ -4,9 +4,14 @@ class AtBat:
             self.main_info = main_info
             self.pitcher = pitcher
             self.batter = batter
+            self.pitch_cnt = 0
+            
+      def update_batter(self, batter):
+            self.batter.update_batter(batter)
 
       def add_history(self, history):
             self.pitch_histories.append(history)
+            self.pitch_cnt = self.pitch_cnt + 1
 
       def add_info(self, pitcher, batter, main_info):
             self.pitcher = pitcher
@@ -41,6 +46,13 @@ class BatterInfo:
 
       def add_atbat(self, atbat):
             self.atbat.append(atbat)
+            
+      def update_batter(self, batter):
+            self.order = batter.order
+            self.name = batter.name
+            self.team = batter.team
+            self.position = batter.position
+            self.hand = batter.hand
 
       def __str__(self):
             return f"BatterInfo: Order={self.order}, Name={self.name}, Position={self.position}, Hand={self.hand}, AtBats={self.atbat}"
@@ -52,8 +64,12 @@ class PitcherInfo:
             self.hand = hand
             self.atbat = []
             self.pitch_cnt = 0
-            self.strikes = 0
-            self.balls = 0
+            
+            self.strikes = []
+            self.balls = []
+            self.fouls = []
+            self.hitted = []
+            self.missed = []
 
       def add_atbat(self, atbat):
             self.atbat.append(atbat)
@@ -62,6 +78,19 @@ class PitcherInfo:
       def __str__(self):
             return f"PitcherInfo: Name={self.name}, Hand={self.hand}, Pitch Count={self.pitch_cnt}, Strikes={self.strikes}, Balls={self.balls}, AtBats={self.atbat}"
 
+      def sort_pitches(self):
+            for atbat in self.atbat:
+                  for history in atbat.pitch_histories:
+                        if history.type.find('스트라이크'):
+                              self.strikes.append(history)
+                        elif history.type.find('볼'):
+                              self.balls.append(history)     
+                        elif history.type.find('파울'):
+                              self.fouls.append(history)
+                        elif history.type.find('타격'):
+                              self.hitted.append(history)
+                        elif history.type.find('헛스윙'):
+                              self.missed.append(history)
 
 class Team:
       def __init__(self, name):
@@ -76,6 +105,12 @@ class Team:
       def set_pitcher(self, pitcher):
             self.pitchers.append(pitcher)
             self.current_pitcher = pitcher
+            
+      def add_batter(self, batter):
+            self.batters.append(batter)
+            
+      def update_batter(self, batter):
+            self.batters.find_batter_by_name(batter.name).update_batter(batter)
       
       def set_lineup(self, lineup):
             for player in lineup:

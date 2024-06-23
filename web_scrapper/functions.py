@@ -2,25 +2,6 @@ from imports import *
 from classes import *
 
 
-# 클래스명 상수 정의
-relay_player_area = 'RelayList_player_area__2ur0q'
-relay_player_info = 'RelayList_player_info__380QS'
-relay_player_profile = 'RelayList_profile_info__2n-fN'
-relay_player_name = 'RelayList_name__1THfS'
-relay_batting_order = 'RelayList_position__M6m4z'
-relay_result_area = 'RelayList_result_area__2j4GI'
-relay_main_info = 'RelayList_main_info__zGpeF'
-relay_points = 'RelayList_point__1IjBt'
-relay_history = 'RelayList_history_list__13jzg'
-relay_pitch_num = 'RelayList_pitch_number__YlthP'
-relay_pitch = 'RelayList_history_item__UEQst RelayList_type_pitch__3jVsu'
-relay_stuff = 'RelayList_stuff__cpnw5'
-relay_text = 'RelayList_text__tFNjV'
-relay_speed = 'RelayList_speed__xA-Qw'
-relay_count = 'RelayList_ball_count__2D8Rd'
-relay_change = 'RelayList_history_item__UEQst RelayList_type_change__2Zxlf'
-
-
 def GetUrl(team_name):
       url = "https://sports.news.naver.com/kbaseball/index"
 
@@ -203,7 +184,43 @@ def process_history(player_area, relay_history, relay_pitch_num, relay_text, rel
                               print(f'{change_text} ')
 
 
-def get_history(atbat, player_area, relay_history, relay_pitch_num, relay_text, relay_stuff, relay_speed, relay_count, relay_change, verbose=True):
+def change_history(defense_team, offense_team, changes, verbose=True):
+      # changes 처리
+      for change_element in changes:
+            change_text = change_element.get_text()
+            change_text = re.sub(r'교체(?! )', '교체 ', change_text)
+            change_text = re.sub(r'OUT', ' OUT ', change_text)
+            change_text = re.sub(r'IN', ' IN', change_text)
+            change_text = re.sub(r'(\w+):', r'\1 :', change_text)
+            #교체 좌익수 : 구자욱 OUT 2루수 : 김동진 IN 
+            #교체 포수 : 강민호 OUT 포수 : 이병헌 IN 
+            #교체 투수 : 김재윤 OUT 투수 : 이승현 IN 
+            if verbose:
+                  print(f'{change_text} ')
+            texts = change_text.split(' ')
+            position1 = texts[1]
+            name1 = texts[3]
+            position2 = texts[5]
+            name2 = texts[7]             
+            
+            if position1 == '투수':
+                  defense_team.set_pitcher(PitcherInfo(name2, None))
+                  return None
+            else:
+                  batter_before = offense_team.find_batter_by_name(name1)
+                  team = offense_team
+                  if batter_before == None:
+                        batter_before = defense_team.find_batter_by_name(name1)
+                        team = defense_team
+
+                  batter = BatterInfo(batter_before.order, name2, team.name, position2, None)
+                  if team.find_batter_by_name(batter.name):
+                        team.update(batter)
+                  else:
+                        team.add_batter(batter)
+
+
+def get_history(offense_team, defense_team, atbat, player_area, relay_history, relay_pitch_num, relay_text, relay_stuff, relay_speed, relay_count, relay_change, verbose=True):
       history_elements = player_area.find_all(class_=relay_history)
       for hist in history_elements:  # 변경된 변수명 hist 사용
             pitch_nums = hist.find_all(class_=relay_pitch_num)
@@ -227,6 +244,9 @@ def get_history(atbat, player_area, relay_history, relay_pitch_num, relay_text, 
             while len(counts) < max_length:
                   counts.insert(0, None)
 
+            if changes:
+                  change_history(defense_team, offense_team, changes, verbose)                  
+
             for pitch_num_element, type_element, speed_element, stuff_element, count_element in zip(reversed(pitch_nums), reversed(types), reversed(speeds), reversed(stuffs), reversed(counts)):
                   pitch_num_text = int(pitch_num_element.get_text()[:-1]) if pitch_num_element else 'N/A'
                   type_text = type_element.get_text() if type_element else 'N/A'
@@ -237,19 +257,8 @@ def get_history(atbat, player_area, relay_history, relay_pitch_num, relay_text, 
                         print(f'{pitch_num_text}구 {type_text}: {speed_text}km/h {stuff_text} | {count_text}')
                   pitch_history = PitchHistory(pitch_num_text, type_text, speed_text, stuff_text, count_text)  # 변경된 변수명 pitch_history 사용
                   atbat.add_history(pitch_history)
-                               
-
-            # changes 처리
-            if changes:
-                  for change_element in changes:
-                        change_text = change_element.get_text()
-                        change_text = re.sub(r'교체(?! )', '교체 ', change_text)
-                        change_text = re.sub(r'OUT', ' OUT ', change_text)
-                        change_text = re.sub(r'IN', ' IN', change_text)
-                        change_text = re.sub(r'(\w+):', r'\1 :', change_text)
-                        if verbose:
-                              print(f'{change_text} ')
-
+                         
+                        
 
 def extract_players(soup, lineup_list_class, lineup_item_class, verbose=True):
       converted_players_away = []
@@ -301,9 +310,6 @@ def ReadLineUp(url, verbose=True):
             Lineup_Item = 'Lineup_lineup_item__32s4M'
             
             away, home = extract_players(soup, Lineup_List, Lineup_Item, verbose)
-            
-            """for player in converted_players:
-                  print(player)"""
                   
             return away, home
                   
@@ -357,46 +363,59 @@ def ReadRelay(url, verbose=True):
                   if click_button_and_wait(driver, button_css_selector):
                         if verbose:
                               print(f'*************** {inning}회 ***************\n')
+                        
                         soup = parse_html(driver)
+                        
+                        offenses = soup.find_all(class_='RelayInfo_relay_info_area__Sha3f')
+                        for offense in reversed(offenses):
+                              offense_title = offense.find(class_='OffenseTitle_title__1LKfI')
+                              offense_title_text = offense_title.get_text()
+                              if verbose:
+                                    print(offense_title_text)
+                              team_name_text = offense_title_text.split(' ')[2]
+                              team_name = team_name_text[:-2]
+                              
+                              player_areas = offense.find_all(class_=relay_player_area)
+                              for player_area in reversed(player_areas):
+                                    batter_atbat = process_player_info(player_area, relay_player_info, relay_player_profile, relay_player_name, relay_batting_order, verbose)
 
-                        player_areas = soup.find_all(class_=relay_player_area)
-                        for player_area in reversed(player_areas):
-                              batter_atbat = process_player_info(player_area, relay_player_info, relay_player_profile, relay_player_name, relay_batting_order, verbose)
-
-                              # Find batter in away or home team
-                              batter = away.find_batter_by_name(batter_atbat)
-                              if batter is None:
-                                    batter = home.find_batter_by_name(batter_atbat)
-
-                              if batter:
-                                    if batter.team == away.name:
-                                          pitcher = home.current_pitcher
+                                    # Find batter in away or home team
+                                    if away.name == team_name:
+                                          offense_team = away
+                                          deffense_team = home
                                     else:
-                                          pitcher = away.current_pitcher
+                                          offense_team = home
+                                          deffense_team = away
+                                    
+                                    batter = offense_team.find_batter_by_name(batter_atbat)
+                                    pitcher = deffense_team.current_pitcher
 
                                     main_info = process_main_info(player_area, relay_main_info, relay_text, relay_points, verbose)
 
                                     # Check if main_info is valid
                                     if main_info:
                                           # AtBat 객체 생성
+                                          if batter == None:
+                                                batter = BatterInfo(0, batter_atbat, offense_team.name, None, None)
+                                                offense_team.add_batter(batter)
+                                          
                                           atbat = AtBat(pitcher, batter, main_info)
                                           
                                           # 히스토리 가져오기
-                                          get_history(atbat, player_area, relay_history, relay_pitch_num, relay_text, relay_stuff, relay_speed, relay_count, relay_change, verbose)
+                                          get_history(offense_team, deffense_team, atbat, player_area, relay_history, relay_pitch_num, relay_text, relay_stuff, relay_speed, relay_count, relay_change, verbose)
                                           pitcher.add_atbat(atbat)
                                           batter.add_atbat(atbat)
                                     else:
                                           print(f"Main info not found or invalid for {batter_atbat}")
-                              else:
-                                    print(f"Batter {batter_atbat} not found in either team")
-                        if verbose: 
-                              print('\n')
-
-            print(away)
-            print(home)
+                                          
+                                          
+                              if verbose: 
+                                    print('\n')
+            return away, home
 
       except Exception as e:
             print(f'Error in ReadRelay: {str(e)}')
+            return away, home
       finally:
             driver.quit()
 
